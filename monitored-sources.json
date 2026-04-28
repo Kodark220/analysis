@@ -1,0 +1,65 @@
+{
+  "keywords": [
+    "hiring",
+    "contributors",
+    "intern",
+    "ambassador",
+    "bounty",
+    "grant",
+    "fellowship",
+    "researcher",
+    "moderator",
+    "business development"
+  ],
+  "projectLimit": 24,
+  "requestTimeoutMs": 4500,
+  "websitePaths": [
+    "/careers",
+    "/jobs",
+    "/docs",
+    "/community",
+    "/discord"
+  ],
+  "xAccounts": [
+    {
+      "label": "Aave",
+      "handle": "aave",
+      "profileUrl": "https://x.com/aave",
+      "rssUrl": "https://rsshub.app/twitter/user/aave"
+    },
+    {
+      "label": "EigenLayer",
+      "handle": "eigenlayer",
+      "profileUrl": "https://x.com/eigenlayer",
+      "rssUrl": "https://rsshub.app/twitter/user/eigenlayer"
+    }
+  ],
+  "webhooks": [
+    {
+      "type": "discord",
+      "label": "Discord Alerts",
+      "enabled": true,
+      "urlEnv": "DISCORD_WEBHOOK_URL"
+    },
+    {
+      "type": "discord",
+      "mode": "analysis",
+      "label": "Discord Analysis",
+      "enabled": true,
+      "urlEnv": "DISCORD_ANALYSIS_WEBHOOK_URL"
+    },
+    {
+      "type": "telegram",
+      "label": "Telegram Alerts",
+      "enabled": true,
+      "botTokenEnv": "TELEGRAM_BOT_TOKEN",
+      "chatIdEnv": "TELEGRAM_CHAT_ID"
+    },
+    {
+      "type": "generic",
+      "label": "Custom Webhook",
+      "enabled": false,
+      "urlEnv": "GENERIC_WEBHOOK_URL"
+    }
+  ]
+}

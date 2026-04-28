@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Tracker — Early Project Alerts</title>
+    <meta name="description" content="Track newly appearing projects, scan websites and watched X feeds for hiring keywords, and open careers, docs, and community links early.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Animated Background -->
+    <div class="bg-grid"></div>
+    <div class="bg-gradient-orb orb-1"></div>
+    <div class="bg-gradient-orb orb-2"></div>
+    <div class="bg-gradient-orb orb-3"></div>
+
+    <!-- Notification Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo-section">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="16" cy="16" r="14" stroke="url(#logoGrad)" stroke-width="2.5"/>
+                        <path d="M10 16L14 20L22 12" stroke="url(#logoGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        <defs>
+                            <linearGradient id="logoGrad" x1="0" y1="0" x2="32" y2="32">
+                                <stop stop-color="#6366f1"/>
+                                <stop offset="1" stop-color="#a855f7"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="logo-text">Alpha Tracker</h1>
+                    <p class="logo-subtitle">Early Project Alerts For Job Hunting</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="live-indicator">
+                    <span class="live-dot"></span>
+                    <span>Live</span>
+                </div>
+                <button id="btn-notify" class="btn btn-primary" onclick="requestNotifications()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                        <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                    </svg>
+                    Enable Notifications
+                </button>
+                <button id="btn-refresh" class="btn btn-secondary" onclick="refreshAll()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"/>
+                        <polyline points="1 20 1 14 7 14"/>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <section class="stats-bar">
+        <div class="stat-card">
+            <div class="stat-value" id="stat-new-protocols">—</div>
+            <div class="stat-label">New Protocols (7d)</div>
+        </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-job-leads">—</div>
+                <div class="stat-label">Job Leads</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-keyword-alerts">—</div>
+                <div class="stat-label">Keyword Hits</div>
+            </div>
+        <div class="stat-card">
+            <div class="stat-value" id="stat-last-update">—</div>
+            <div class="stat-label">Last Updated</div>
+        </div>
+    </section>
+
+    <section class="status-panel" id="status-panel">
+        <div class="status-panel-head">
+            <h2>Monitor Status</h2>
+            <p id="status-summary">Checking backend channels and warnings...</p>
+        </div>
+        <div class="status-grid" id="status-grid"></div>
+        <div class="status-warnings hidden" id="status-warnings"></div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="new-protocols" onclick="switchTab('new-protocols')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                New Protocols
+                <span class="tab-badge" id="badge-protocols">0</span>
+            </button>
+            <button class="tab-btn" data-tab="trending" onclick="switchTab('trending')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+                    <polyline points="17 6 23 6 23 12"/>
+                </svg>
+                Job Leads
+                <span class="tab-badge" id="badge-job-leads">0</span>
+            </button>
+            <button class="tab-btn" data-tab="new-listings" onclick="switchTab('new-listings')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="16"/>
+                    <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                Signal Watch
+                <span class="tab-badge" id="badge-signal-leads">0</span>
+            </button>
+            <button class="tab-btn" data-tab="watchlist" onclick="switchTab('watchlist')">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Watchlist
+                <span class="tab-badge" id="badge-watchlist">0</span>
+            </button>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="search-box">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="text" id="search-input" placeholder="Search projects, chains, categories..." oninput="handleSearch(this.value)">
+            </div>
+            <div class="filter-chips" id="filter-chips">
+                <button class="chip active" onclick="filterByCategory('all', this)">All</button>
+                <button class="chip" onclick="filterByCategory('Lending', this)">Lending</button>
+                <button class="chip" onclick="filterByCategory('Dexs', this)">DEXs</button>
+                <button class="chip" onclick="filterByCategory('Liquid Staking', this)">Liquid Staking</button>
+                <button class="chip" onclick="filterByCategory('Bridge', this)">Bridge</button>
+                <button class="chip" onclick="filterByCategory('CDP', this)">CDP</button>
+                <button class="chip" onclick="filterByCategory('Yield', this)">Yield</button>
+                <button class="chip" onclick="filterByCategory('RWA', this)">RWA</button>
+            </div>
+            <select id="time-filter" class="time-select" onchange="filterByTime(this.value)">
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30">Last 30 days</option>
+                <option value="90">Last 90 days</option>
+            </select>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content" id="tab-content">
+            <!-- New Protocols Panel -->
+            <div class="tab-panel active" id="panel-new-protocols">
+                <div class="loading-state" id="loading-protocols">
+                    <div class="spinner"></div>
+                    <p>Scanning for new protocols...</p>
+                </div>
+                <div class="project-grid" id="grid-protocols"></div>
+            </div>
+
+            <!-- Trending Panel -->
+            <div class="tab-panel" id="panel-trending">
+                <div class="loading-state" id="loading-trending">
+                    <div class="spinner"></div>
+                    <p>Scanning project websites for careers, docs, and community pages...</p>
+                </div>
+                <div class="project-grid" id="grid-trending"></div>
+            </div>
+
+            <!-- New Listings Panel -->
+            <div class="tab-panel" id="panel-new-listings">
+                <div class="loading-state" id="loading-listings">
+                    <div class="spinner"></div>
+                    <p>Checking project sites and watched X feeds for hiring keywords...</p>
+                </div>
+                <div class="project-grid" id="grid-listings"></div>
+            </div>
+
+            <!-- Watchlist Panel -->
+            <div class="tab-panel" id="panel-watchlist">
+                <div class="empty-state" id="empty-watchlist">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                    </svg>
+                    <h3>No items in watchlist</h3>
+                    <p>Click the star icon on any project to add it here</p>
+                </div>
+                <div class="project-grid" id="grid-watchlist"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>Data sourced from <a href="https://defillama.com" target="_blank">DeFiLlama</a></p>
+        <p class="footer-note">Run the local backend with <strong>node server.js</strong> • Configure watched X feeds, keywords, and webhooks in monitored-sources.json</p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
