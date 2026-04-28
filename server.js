@@ -6,6 +6,7 @@ const path = require('path');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
+const IS_VERCEL = Boolean(process.env.VERCEL);
 const CACHE_TTL_MS = 2 * 60 * 1000;
 const DEFAULT_TIMEOUT_MS = 5000;
 const DEFAULT_KEYWORDS = ['hiring', 'contributors', 'intern', 'ambassador', 'bounty', 'grant', 'fellowship', 'researcher', 'moderator', 'business development'];
@@ -94,14 +95,15 @@ async function serveStatic(pathname, response) {
 
 async function buildDiscoveryPayload(days, config) {
     const keywords = Array.from(new Set((config.keywords || DEFAULT_KEYWORDS).map(keyword => String(keyword).toLowerCase())));
-    const timeoutMs = clampNumber(Number(config.requestTimeoutMs || DEFAULT_TIMEOUT_MS), 1500, 10000);
-    const projectLimit = clampNumber(Number(config.projectLimit || 24), 6, 40);
+    const executionProfile = getExecutionProfile(config);
+    const timeoutMs = executionProfile.timeoutMs;
+    const projectLimit = executionProfile.projectLimit;
     const channelStatuses = buildChannelStatuses(config.webhooks || []);
     const alertStore = buildAlertStoreStatus();
     const warnings = buildConfigWarnings(config, channelStatuses, alertStore);
     const protocols = await fetchProtocols(days, projectLimit, timeoutMs);
-    const enrichedProtocols = await mapLimit(protocols, 4, protocol => enrichProtocol(protocol, keywords, timeoutMs, config.websitePaths || DEFAULT_WEBSITE_PATHS));
-    const xAlerts = await fetchXAlerts(config.xAccounts || [], keywords, timeoutMs);
+    const enrichedProtocols = await mapLimit(protocols, executionProfile.enrichmentConcurrency, protocol => enrichProtocol(protocol, keywords, timeoutMs, config.websitePaths || DEFAULT_WEBSITE_PATHS, executionProfile));
+    const xAlerts = await fetchXAlerts(config.xAccounts || [], keywords, timeoutMs, executionProfile);
     const protocolsWithMentions = attachXSignals(enrichedProtocols, xAlerts);
     const keywordAlerts = buildKeywordAlerts(protocolsWithMentions, xAlerts);
     const deliveryStats = await notifyWebhooks(keywordAlerts, config.webhooks || [], timeoutMs);
@@ -116,6 +118,7 @@ async function buildDiscoveryPayload(days, config) {
             websitePaths: config.websitePaths || DEFAULT_WEBSITE_PATHS,
             channelStatuses,
             alertStore: publicAlertStoreStatus(alertStore),
+            executionProfile: publicExecutionProfile(executionProfile),
             warnings,
             windowsEnvSupported: true
         },
@@ -176,7 +179,7 @@ async function fetchProtocols(days, projectLimit, timeoutMs) {
         });
 }
 
-async function enrichProtocol(protocol, keywords, timeoutMs, websitePaths) {
+async function enrichProtocol(protocol, keywords, timeoutMs, websitePaths, executionProfile) {
     if (!protocol.websiteUrl) {
         return protocol;
     }
@@ -192,7 +195,7 @@ async function enrichProtocol(protocol, keywords, timeoutMs, websitePaths) {
             projectName: protocol.name
         });
 
-        for (const link of quickLinks.slice(0, 3)) {
+        for (const link of quickLinks.slice(0, executionProfile.quickLinkScanLimit)) {
             try {
                 const page = await fetchText(link.url, timeoutMs);
                 signals.push(...scanForKeywords(stripHtml(page), keywords, {
@@ -245,7 +248,7 @@ async function buildQuickLinks(links, websiteUrl, websitePaths, timeoutMs) {
     return dedupeLinks(selected);
 }
 
-async function fetchXAlerts(accounts, keywords, timeoutMs) {
+async function fetchXAlerts(accounts, keywords, timeoutMs, executionProfile) {
     const alerts = [];
 
     for (const account of accounts) {
@@ -257,7 +260,7 @@ async function fetchXAlerts(accounts, keywords, timeoutMs) {
             const rss = await fetchText(account.rssUrl, timeoutMs);
             const items = parseRssItems(rss);
 
-            for (const item of items.slice(0, 8)) {
+            for (const item of items.slice(0, executionProfile.feedItemLimit)) {
                 const text = `${item.title} ${item.description}`.toLowerCase();
                 for (const keyword of keywords) {
                     if (!new RegExp(`\\b${escapeRegex(keyword)}\\b`, 'i').test(text)) {
@@ -866,6 +869,42 @@ function buildAlertStoreStatus() {
         missing,
         partial: missing.length > 0 && missing.length < 2,
         copy: 'Using a local disk cache for delivered alerts. Add Supabase env vars for shared persistence across machines.'
+    };
+}
+
+function getExecutionProfile(config) {
+    const requestedTimeout = clampNumber(Number(config.requestTimeoutMs || DEFAULT_TIMEOUT_MS), 1500, 10000);
+    const requestedProjectLimit = clampNumber(Number(config.projectLimit || 24), 6, 40);
+
+    if (!IS_VERCEL) {
+        return {
+            mode: 'local',
+            timeoutMs: requestedTimeout,
+            projectLimit: requestedProjectLimit,
+            enrichmentConcurrency: 4,
+            quickLinkScanLimit: 3,
+            feedItemLimit: 8
+        };
+    }
+
+    return {
+        mode: 'vercel',
+        timeoutMs: Math.min(requestedTimeout, 2500),
+        projectLimit: Math.min(requestedProjectLimit, 10),
+        enrichmentConcurrency: 3,
+        quickLinkScanLimit: 1,
+        feedItemLimit: 5
+    };
+}
+
+function publicExecutionProfile(profile) {
+    return {
+        mode: profile.mode,
+        timeoutMs: profile.timeoutMs,
+        projectLimit: profile.projectLimit,
+        enrichmentConcurrency: profile.enrichmentConcurrency,
+        quickLinkScanLimit: profile.quickLinkScanLimit,
+        feedItemLimit: profile.feedItemLimit
     };
 }
 
