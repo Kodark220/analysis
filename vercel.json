@@ -5,6 +5,19 @@
       "maxDuration": 30
     }
   },
+  "routes": [
+    {
+      "src": "/api/discovery",
+      "dest": "/api/discovery.js"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
