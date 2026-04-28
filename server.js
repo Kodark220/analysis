@@ -115,7 +115,7 @@ async function buildDiscoveryPayload(days, config) {
             webhookTargets: (config.webhooks || []).filter(webhook => webhook.enabled !== false).length,
             websitePaths: config.websitePaths || DEFAULT_WEBSITE_PATHS,
             channelStatuses,
-            alertStore,
+            alertStore: publicAlertStoreStatus(alertStore),
             warnings,
             windowsEnvSupported: true
         },
@@ -858,6 +858,19 @@ function buildAlertStoreStatus() {
         missing,
         partial: missing.length > 0 && missing.length < 2,
         copy: 'Using a local disk cache for delivered alerts. Add Supabase env vars for shared persistence across machines.'
+    };
+}
+
+function publicAlertStoreStatus(alertStore) {
+    return {
+        mode: alertStore.mode,
+        label: alertStore.label,
+        configured: alertStore.configured,
+        useSupabase: alertStore.useSupabase,
+        table: alertStore.table,
+        missing: alertStore.missing,
+        partial: alertStore.partial,
+        copy: alertStore.copy
     };
 }
 
