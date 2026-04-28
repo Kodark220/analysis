@@ -145,6 +145,14 @@ async function reportStartupStatus() {
 }
 
 async function fetchProtocols(days, projectLimit, timeoutMs) {
+    const [llamaProtocols, geckoProjects] = await Promise.all([
+        fetchDefiLlamaProtocols(days, projectLimit, timeoutMs),
+        fetchGeckoTerminalProjects(days, projectLimit, timeoutMs)
+    ]);
+    return mergeDiscoveredProjects([...llamaProtocols, ...geckoProjects], projectLimit);
+}
+
+async function fetchDefiLlamaProtocols(days, projectLimit, timeoutMs) {
     const data = await fetchJson('https://api.llama.fi/protocols', timeoutMs);
     const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
 
@@ -177,6 +185,78 @@ async function fetchProtocols(days, projectLimit, timeoutMs) {
             metrics: []
             });
         });
+}
+
+async function fetchGeckoTerminalProjects(days, projectLimit, timeoutMs) {
+    const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+    const response = await fetchJson('https://api.geckoterminal.com/api/v2/networks/new_pools?page=1', timeoutMs);
+    const pools = Array.isArray(response?.data) ? response.data : [];
+
+    return pools
+        .map(pool => normalizeGeckoTerminalProject(pool))
+        .filter(Boolean)
+        .filter(project => project.listedAt >= cutoff)
+        .filter(project => project.tvl >= 5000)
+        .filter(project => !/(scam|invalid)/i.test(project.name))
+        .sort((left, right) => right.listedAt - left.listedAt)
+        .slice(0, Math.max(4, Math.ceil(projectLimit / 2)));
+}
+
+function normalizeGeckoTerminalProject(pool) {
+    const attributes = pool?.attributes || {};
+    const poolAddress = String(attributes.address || '').trim();
+    const createdAt = Date.parse(attributes.pool_created_at || '');
+    const poolName = String(attributes.name || '').trim();
+    const baseName = poolName.split('/')[0]?.trim() || poolName;
+    const networkId = String(pool?.id || '').split('_')[0] || '';
+
+    if (!poolAddress || !baseName || !Number.isFinite(createdAt)) {
+        return null;
+    }
+
+    const reserveUsd = Number.parseFloat(attributes.reserve_in_usd || '0');
+    const marketCap = Number.parseFloat(attributes.market_cap_usd || attributes.fdv_usd || '0');
+    const sourceUrl = networkId
+        ? `https://www.geckoterminal.com/${networkId}/pools/${poolAddress}`
+        : '';
+
+    return {
+        id: `gecko-${slugify(networkId)}-${slugify(poolAddress)}`,
+        name: baseName,
+        symbol: '',
+        slug: slugify(baseName),
+        category: 'New Pool',
+        chain: formatNetworkName(networkId),
+        description: `${baseName} is a newly created pool detected on GeckoTerminal before broader protocol trackers may pick it up.`,
+        logo: '',
+        url: sourceUrl,
+        sourceUrl,
+        websiteUrl: '',
+        tvl: Number.isFinite(reserveUsd) ? reserveUsd : 0,
+        mcap: Number.isFinite(marketCap) ? marketCap : 0,
+        listedAt: createdAt,
+        quickLinks: [],
+        keywordSignals: [],
+        signalCount: 0,
+        metrics: [],
+        discoverySource: 'GeckoTerminal'
+    };
+}
+
+function mergeDiscoveredProjects(projects, projectLimit) {
+    const seen = new Set();
+
+    return projects
+        .sort((left, right) => right.listedAt - left.listedAt)
+        .filter(project => {
+            const key = `${slugify(project.name)}|${slugify(project.chain)}`;
+            if (seen.has(key)) {
+                return false;
+            }
+            seen.add(key);
+            return true;
+        })
+        .slice(0, projectLimit);
 }
 
 async function enrichProtocol(protocol, keywords, timeoutMs, websitePaths, executionProfile) {
@@ -1047,6 +1127,12 @@ function normalizeUrl(value) {
     }
 
     return '';
+}
+
+function formatNetworkName(value) {
+    return String(value || 'Unknown')
+        .replace(/[-_]+/g, ' ')
+        .replace(/\b\w/g, letter => letter.toUpperCase());
 }
 
 function escapeRegex(value) {

@@ -265,6 +265,7 @@ function buildCardMarkup(item, mode) {
     const isStarred = state.watchlist.includes(item.id);
     const isNew = item.listedAt ? Date.now() - item.listedAt <= NEW_ITEM_WINDOW_MS : mode !== 'watchlist';
     const badge = mode === 'signalLeads' ? `<div class="trending-rank">${escapeHtml(String(item.signalCount || 0))}</div>` : '';
+    const discoveryLabel = item.discoverySource ? `${item.category} • ${item.discoverySource}` : item.category;
 
     return `
         <article class="project-card ${isNew ? 'new-highlight' : ''}">
@@ -285,7 +286,7 @@ function buildCardMarkup(item, mode) {
                     </button>
                 </div>
             </div>
-            <div class="card-category">${escapeHtml(item.category)}</div>
+            <div class="card-category">${escapeHtml(discoveryLabel)}</div>
             <div class="card-desc">${escapeHtml(item.description)}</div>
             <div class="card-metrics">
                 ${(item.metrics || []).map(metric => `
