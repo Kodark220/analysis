@@ -1,5 +1,27 @@
 {
   "version": 2,
+  "builds": [
+    {
+      "src": "api/discovery.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "app.js",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "style.css",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "favicon.svg",
+      "use": "@vercel/static"
+    }
+  ],
   "functions": {
     "api/discovery.js": {
       "maxDuration": 30
@@ -9,6 +31,10 @@
     {
       "src": "/api/discovery",
       "dest": "/api/discovery.js"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "/favicon.svg"
     },
     {
       "handle": "filesystem"
