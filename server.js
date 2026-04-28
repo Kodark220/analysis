@@ -595,6 +595,10 @@ async function markAlertsDelivered(alerts, alertStore, timeoutMs) {
 }
 
 async function readLocalAlertStore() {
+    if (!canUseLocalAlertStore()) {
+        return new Set();
+    }
+
     try {
         const raw = await fs.readFile(LOCAL_ALERT_STORE_PATH, 'utf8');
         const parsed = JSON.parse(raw);
@@ -613,6 +617,10 @@ async function readLocalAlertStore() {
 }
 
 async function writeLocalAlertStore(ids) {
+    if (!canUseLocalAlertStore()) {
+        return;
+    }
+
     const uniqueIds = Array.from(new Set(ids)).slice(-1000);
     await fs.writeFile(LOCAL_ALERT_STORE_PATH, JSON.stringify({ ids: uniqueIds }, null, 2), 'utf8');
 }
@@ -859,6 +867,10 @@ function buildAlertStoreStatus() {
         partial: missing.length > 0 && missing.length < 2,
         copy: 'Using a local disk cache for delivered alerts. Add Supabase env vars for shared persistence across machines.'
     };
+}
+
+function canUseLocalAlertStore() {
+    return !process.env.VERCEL;
 }
 
 function publicAlertStoreStatus(alertStore) {
