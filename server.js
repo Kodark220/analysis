@@ -53,17 +53,20 @@ if (require.main === module) {
 
 async function handleDiscoveryUrl(url, response) {
     const days = clampNumber(Number.parseInt(url.searchParams.get('days') || '7', 10), 1, 90);
-    const cacheKey = `days:${days}`;
+    const forceAlerts = isTruthyQueryParam(url.searchParams.get('forceAlerts'));
+    const cacheKey = `days:${days}:force:${forceAlerts ? '1' : '0'}`;
     const cached = cache.get(cacheKey);
 
-    if (cached && cached.expiresAt > Date.now()) {
+    if (!forceAlerts && cached && cached.expiresAt > Date.now()) {
         writeJson(response, cached.payload);
         return;
     }
 
     const config = await loadConfig();
-    const payload = await buildDiscoveryPayload(days, config);
-    cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
+    const payload = await buildDiscoveryPayload(days, config, { forceAlerts });
+    if (!forceAlerts) {
+        cache.set(cacheKey, { expiresAt: Date.now() + CACHE_TTL_MS, payload });
+    }
     writeJson(response, payload);
 }
 
@@ -93,7 +96,7 @@ async function serveStatic(pathname, response) {
     }
 }
 
-async function buildDiscoveryPayload(days, config) {
+async function buildDiscoveryPayload(days, config, options = {}) {
     const keywords = Array.from(new Set((config.keywords || DEFAULT_KEYWORDS).map(keyword => String(keyword).toLowerCase())));
     const executionProfile = getExecutionProfile(config);
     const timeoutMs = executionProfile.timeoutMs;
@@ -106,7 +109,7 @@ async function buildDiscoveryPayload(days, config) {
     const xAlerts = await fetchXAlerts(config.xAccounts || [], keywords, timeoutMs, executionProfile);
     const protocolsWithMentions = attachXSignals(enrichedProtocols, xAlerts);
     const keywordAlerts = buildKeywordAlerts(protocolsWithMentions, xAlerts);
-    const deliveryStats = await notifyWebhooks(keywordAlerts, config.webhooks || [], timeoutMs);
+    const deliveryStats = await notifyWebhooks(keywordAlerts, config.webhooks || [], timeoutMs, options);
 
     return {
         generatedAt: new Date().toISOString(),
@@ -593,10 +596,14 @@ async function loadConfig() {
 }
 
 async function notifyWebhooks(alerts, webhooks, timeoutMs) {
+    const options = arguments[3] || {};
     const enabledHooks = (webhooks || []).filter(webhook => webhook && webhook.enabled !== false);
     const alertStore = buildAlertStoreStatus();
     const storedAlertIds = await getStoredAlertIds(alerts.map(alert => alert.id), alertStore, timeoutMs);
-    const newAlerts = alerts.filter(alert => !deliveredAlertIds.has(alert.id) && !storedAlertIds.has(alert.id));
+    const forceAlerts = Boolean(options.forceAlerts);
+    const newAlerts = forceAlerts
+        ? alerts
+        : alerts.filter(alert => !deliveredAlertIds.has(alert.id) && !storedAlertIds.has(alert.id));
 
     if (enabledHooks.length === 0 || newAlerts.length === 0) {
         return {
@@ -631,7 +638,8 @@ async function notifyWebhooks(alerts, webhooks, timeoutMs) {
     return {
         enabled: enabledHooks.length,
         sent,
-        store: alertStore.mode
+        store: alertStore.mode,
+        forced: forceAlerts
     };
 }
 
@@ -1127,6 +1135,10 @@ function normalizeUrl(value) {
     }
 
     return '';
+}
+
+function isTruthyQueryParam(value) {
+    return /^(1|true|yes|on)$/i.test(String(value || '').trim());
 }
 
 function formatNetworkName(value) {
